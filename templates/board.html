@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Customer Board · CRM Pro{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Customer Board</h4>
+    <div class="text-secondary small">Drag customer cards across the pipeline stages</div>
+  </div>
+  <div class="d-flex gap-2">
+    <form method="get" class="d-flex gap-2">
+      <div class="input-group input-group-sm" style="width:260px">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search customer, contact, email, source...">
+      </div>
+      <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button>
+      {% if search %}<a href="/board" class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></a>{% endif %}
+    </form>
+    <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#leadSidebar"><i class="bi bi-person-plus me-1"></i>New Lead</button>
+  </div>
+</div>
+
+<div class="board-container">
+  {% for key, label in stages %}
+  <div class="board-col" data-stage="{{ key }}">
+    <div class="board-col-head {{ key|lower }}">
+      <span class="fw-bold">{{ label }}</span>
+      <span class="badge text-bg-light">{{ cards|selectattr('stage','equalto',key)|list|length }}</span>
+    </div>
+    <div class="board-col-body" data-drop-stage="{{ key }}">
+      {% for c in cards if c.stage == key %}
+      <div class="board-card" draggable="true" data-id="{{ c.id }}">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="fw-semibold board-company">{{ c.company }}</div>
+          <i class="bi bi-grip-vertical text-secondary"></i>
+        </div>
+        {% if c.contact %}<div class="small text-secondary">{{ c.contact }}</div>{% endif %}
+        <div class="small text-secondary">
+          {% if c.email %}<div><i class="bi bi-envelope me-1"></i>{{ c.email }}</div>{% endif %}
+          {% if c.phone %}<div><i class="bi bi-telephone me-1"></i>{{ c.phone }}</div>{% endif %}
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          {% if c.source %}<span class="lead-source-chip">{{ c.source }}</span>{% else %}<span></span>{% endif %}
+          <span class="small fw-semibold text-primary" title="Pipeline value">RM {{ "%.2f"|format(c.value) }}</span>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not (cards|selectattr('stage','equalto',key)|list) %}
+      <div class="board-empty">Drop cards here</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var dragged = null;
+
+  document.querySelectorAll('.board-card').forEach(function (card) {
+    card.addEventListener('dragstart', function (e) {
+      dragged = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', function () {
+      card.classList.remove('dragging');
+      dragged = null;
+      document.querySelectorAll('.board-col-body').forEach(function (b) { b.classList.remove('over'); });
+    });
+  });
+
+  document.querySelectorAll('.board-col-body').forEach(function (body) {
+    body.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      body.classList.add('over');
+    });
+    body.addEventListener('dragleave', function () {
+      body.classList.remove('over');
+    });
+    body.addEventListener('drop', function (e) {
+      e.preventDefault();
+      body.classList.remove('over');
+      if (!dragged) return;
+      var stage = body.getAttribute('data-drop-stage');
+      var empty = body.querySelector('.board-empty');
+      if (empty) empty.remove();
+      body.appendChild(dragged);
+      // save to server
+      var fd = new FormData();
+      fd.append('id', dragged.getAttribute('data-id'));
+      fd.append('stage', stage);
+      fetch('/board/move', { method: 'POST', body: fd }).then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) updateCounts(); })
+        .catch(function () {});
+    });
+  });
+
+  function updateCounts() {
+    document.querySelectorAll('.board-col').forEach(function (col) {
+      var stage = col.getAttribute('data-stage');
+      var count = col.querySelectorAll('.board-card').length;
+      col.querySelector('.badge').textContent = count;
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Leads · CRM Pro{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Leads &amp; Contacts</h4>
+    <div class="text-secondary small">Standalone leads — lead data is kept separate from quotations</div>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-lg me-1"></i>Add Lead</button>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card primary"><div class="card-body">
+      <div class="kpi-label">Total Leads</div><div class="kpi-value">{{ total_leads }}</div>
+      <div class="kpi-sub">all leads</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card info"><div class="card-body">
+      <div class="kpi-label">Active (New/Contacted)</div><div class="kpi-value">{{ active_count }}</div>
+      <div class="kpi-sub">in the pipeline</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card warning"><div class="card-body">
+      <div class="kpi-label">Quoted / In Progress</div><div class="kpi-value">{{ quoted_count }}</div>
+      <div class="kpi-sub">leads in progress</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card success"><div class="card-body">
+      <div class="kpi-label">Deal Won</div><div class="kpi-value">{{ won_count }}</div>
+      <div class="kpi-sub">won leads</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-md-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search name, company, email, phone...">
+        </div>
+      </div>
+      <div class="col-md-2">
+        <select name="month" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Month: All</option>
+          {% for m in range(1,13) %}<option value="{{ '%02d'|format(m) }}" {{ 'selected' if month==('%02d'|format(m)) }}>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Year: All</option>
+          {% for y in years_avail %}<option value="{{ y }}" {{ 'selected' if year==y }}>{{ y }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="source" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Source: All</option>
+          {% for s in sources_avail %}<option value="{{ s }}" {{ 'selected' if source==s }}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Statuses</option>
+          {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status==s }}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1"><a href="/leads" class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-arrow-counterclockwise"></i></a></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0 product-table">
+      <thead class="table-light"><tr>
+        <th>Name</th><th>Company</th><th>Contact</th><th>Source</th><th>Status</th><th>Date</th><th class="text-end">Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for l in leads %}
+        <tr>
+          <td class="fw-semibold">{{ l.name }}</td>
+          <td>{{ l.company }}</td>
+          <td class="small text-secondary">{{ l.email }}{% if l.phone %}<br>{{ l.phone }}{% endif %}</td>
+          <td>{% if l.source %}<a href="/leads?source={{ l.source }}" class="lead-source-chip">{{ l.source }}</a>{% else %}—{% endif %}</td>
+          <td>
+            <form method="post" action="/leads/status" class="d-inline">
+              <input type="hidden" name="id" value="{{ l.id }}">
+              <select name="status" class="form-select form-select-sm stage-select" onchange="this.form.submit()">
+                {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if s==l.status }}>{{ s }}</option>{% endfor %}
+              </select>
+            </form>
+          </td>
+          <td>{{ l.date }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ l.id }}"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delModal{{ l.id }}"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center text-secondary py-4">No leads found. Add your first lead.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/leads/add">
+      <div class="modal-header"><h5 class="modal-title">Add Lead</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Name <span class="text-danger">*</span></label><input name="name" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Company</label><input name="company" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Phone</label><input name="phone" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Email</label><input name="email" type="email" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Lead Source</label><input name="source" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Status</label>
+            <select name="status" class="form-select">{% for s in statuses %}<option>{{ s }}</option>{% endfor %}</select></div>
+          <div class="col-6"><label class="form-label">Date</label><input type="date" name="date" class="form-control"></div>
+          <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+
+{% for l in leads %}
+<div class="modal fade" id="editModal{{ l.id }}" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/leads/edit">
+      <input type="hidden" name="id" value="{{ l.id }}">
+      <div class="modal-header"><h5 class="modal-title">Edit Lead</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Name</label><input name="name" value="{{ l.name }}" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Company</label><input name="company" value="{{ l.company }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Phone</label><input name="phone" value="{{ l.phone }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Email</label><input name="email" value="{{ l.email }}" type="email" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Lead Source</label><input name="source" value="{{ l.source }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Status</label>
+            <select name="status" class="form-select">{% for s in statuses %}<option {{ 'selected' if s==l.status }}>{{ s }}</option>{% endfor %}</select></div>
+          <div class="col-6"><label class="form-label">Date</label><input type="date" name="date" value="{{ l.date }}" class="form-control"></div>
+          <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2">{{ l.notes }}</textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="delModal{{ l.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm"><div class="modal-content">
+    <form method="post" action="/leads/delete">
+      <input type="hidden" name="id" value="{{ l.id }}">
+      <div class="modal-body text-center py-4">
+        <i class="bi bi-exclamation-triangle text-danger" style="font-size:2.5rem"></i>
+        <p class="mt-2 mb-0">Delete lead <b>{{ l.name }}</b>?<br><small class="text-secondary">This cannot be undone.</small></p>
+      </div>
+      <div class="modal-footer justify-content-center"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger">Delete</button></div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+
+{% endblock %}

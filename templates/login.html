@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login · CRM Pro</title>
+  <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    html, body { height: 100%; }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0b1f3a 0%, #1b3a6b 55%, #2a56c6 100%);
+      margin: 0;
+    }
+    .login-card {
+      width: 100%; max-width: 400px;
+      border-radius: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    .login-card .card-header {
+      background: #fff; border-radius: 18px 18px 0 0;
+      padding: 1.5rem; text-align: center;
+    }
+    .brand-badge-lg {
+      width: 56px; height: 56px; font-size: 1.8rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 14px; background: linear-gradient(135deg,#4f7cff,#2a56c6);
+      color: #fff;
+    }
+    .login-card .card-body { padding: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="card login-card border-0">
+    <div class="card-header">
+      <span class="brand-badge-lg mb-2"><i class="bi bi-cpu"></i></span>
+      <h4 class="fw-bold mb-0 mt-2">CRM <b>Pro</b></h4>
+      <div class="text-secondary small">Sign in to continue</div>
+      <div class="text-secondary small fw-semibold mt-1">v2.0 — with Login</div>
+    </div>
+    <div class="card-body">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'success' if cat=='success' else 'danger' }} alert-dismissible fade show py-2 small" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+      <form method="post" action="/login">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Username</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-person"></i></span>
+            <input type="text" name="username" class="form-control" placeholder="Enter username" required autofocus>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Password</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <input type="password" name="password" class="form-control" placeholder="Enter password" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</button>
+      </form>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

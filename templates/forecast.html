@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block title %}Forecast · CRM Pro{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Forecast</h4>
+    <div class="text-secondary small">Project a customer's order — select a customer, add products, see cost / selling / profit</div>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newForecastModal"><i class="bi bi-plus-lg me-1"></i>New Forecast</button>
+</div>
+
+<!-- Search / filter bar -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-md-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search by company / forecast no / items...">
+        </div>
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" title="From date">
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" title="To date">
+      </div>
+      <div class="col-md-2">
+        <select name="month" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Month: All</option>
+          {% for m in range(1,13) %}
+          <option value="{{ '%02d'|format(m) }}" {{ 'selected' if month_f==('%02d'|format(m)) }}>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Year: All</option>
+          {% for y in years_avail %}<option value="{{ y }}" {{ 'selected' if year_f==y }}>{{ y }}</option>{% endfor %}
+          <option value="{{ cur_year }}" {{ 'selected' if year_f==cur_year|string }}>{{ cur_year }}</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Status</option>
+          {% for s in ['Open','Won','Lost'] %}<option value="{{ s }}" {{ 'selected' if status_f==s }}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel me-1"></i>Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card primary"><div class="card-body">
+      <div class="kpi-label">Total Forecasts</div><div class="kpi-value">{{ fc_count }}</div>
+      <div class="kpi-sub">{{ fc_open }} open</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card info"><div class="card-body">
+      <div class="kpi-label">Forecast Value (RM)</div><div class="kpi-value">RM {{ "{:,.0f}".format(total_value) }}</div>
+      <div class="kpi-sub">total projected sales</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card success"><div class="card-body">
+      <div class="kpi-label">Potential Profit (RM)</div><div class="kpi-value">RM {{ "{:,.0f}".format(total_profit) }}</div>
+      <div class="kpi-sub">projected gross profit</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card danger"><div class="card-body">
+      <div class="kpi-label">Open Pipeline (RM)</div><div class="kpi-value">RM {{ "{:,.0f}".format(open_value) }}</div>
+      <div class="kpi-sub">open forecasts</div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Saved forecasts -->
+<div class="card chart-card">
+  <div class="card-header bg-white"><i class="bi bi-list-check text-primary me-1"></i>Saved Forecasts ({{ forecasts|length }})</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr>
+        <th>Forecast</th><th>Date</th><th>Customer</th><th>Items</th>
+        <th class="text-end">Cost</th><th class="text-end">Value</th><th class="text-end">Profit</th>
+        <th>Status</th><th class="text-end">Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for f in forecasts %}
+        <tr>
+          <td class="fw-semibold">{{ f.fc_no }}</td>
+          <td>{{ f.date }}</td>
+          <td>{{ f.customer }}</td>
+          <td class="small text-secondary" style="max-width:220px" title="{{ f['items'] }}">{{ f['items'] }}</td>
+          <td class="text-end">RM {{ "%.2f"|format(f.cost) }}</td>
+          <td class="text-end text-primary fw-semibold">RM {{ "%.2f"|format(f.value) }}</td>
+          <td class="text-end text-success">RM {{ "%.2f"|format(f.profit) }}</td>
+          <td>
+            <form method="post" action="/forecasts/status" class="d-inline">
+              <input type="hidden" name="id" value="{{ f.id }}">
+              <select name="status" class="form-select form-select-sm stage-select" onchange="this.form.submit()">
+                {% for s in ['Open','Won','Lost'] %}<option value="{{ s }}" {{ 'selected' if s==f.status }}>{{ s }}</option>{% endfor %}
+              </select>
+            </form>
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editFc{{ f.id }}" title="Edit"><i class="bi bi-pencil"></i></button>
+            <form method="post" action="/forecasts/delete" class="d-inline" onsubmit="return confirm('Delete forecast {{ f.fc_no }}?');">
+              <input type="hidden" name="id" value="{{ f.id }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="text-center text-secondary py-4">No forecasts yet. Click "New Forecast" to create one.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New Forecast modal -->
+<div class="modal fade" id="newForecastModal" tabindex="-1">
+  <div class="modal-dialog modal-xl"><div class="modal-content">
+    <form method="post" action="/forecasts/add">
+      <div class="modal-header"><h5 class="modal-title">New Forecast</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-7">
+            <label class="form-label">Customer <span class="text-danger">*</span></label>
+            <input name="customer" class="form-control customer-combobox" list="companyListF" placeholder="Type new or search existing customer" required>
+            <datalist id="companyListF">
+              {% for n in company_names %}<option value="{{ n }}"></option>{% endfor %}
+            </datalist>
+            <div class="form-text">Pick an existing customer, or type a new one to add it.</div>
+          </div>
+          <div class="col-md-3"><label class="form-label">Date</label><input type="date" name="date" class="form-control"></div>
+          <div class="col-md-2"><label class="form-label">Status</label>
+            <select name="status" class="form-select"><option>Open</option><option>Won</option><option>Lost</option></select>
+          </div>
+        </div>
+
+        <hr>
+        <label class="form-label fw-semibold">Products / Items</label>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2">
+            <thead class="table-light"><tr>
+              <th class="fc-col-product">Product</th><th>Qty</th>
+              <th>Cost</th><th>SRP</th><th>Margin %</th>
+              <th class="text-end">Unit Price</th><th>SST 8%</th>
+              <th class="text-end">Total</th><th></th>
+            </tr></thead>
+            <tbody id="fcLines">
+              <tr class="fc-line">
+                <td>
+                  <select name="product_id" class="form-select form-select-sm fc-product">
+                    <option value="">-- Choose product --</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}" data-price="{{ p.selling }}" data-profit="{{ p.profit }}" data-srp="{{ p.srp or '' }}" data-margin="{{ p.margin }}" data-cost="{{ p.cost }}" data-cat="{{ p.category }}">{{ p.name }} ({{ p.pid }})</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" name="qty" class="form-control form-control-sm fc-qty" value="1" min="1"></td>
+                <td><input type="number" name="cost" step="0.01" class="form-control form-control-sm fc-cost"></td>
+                <td><input type="number" name="srp" step="0.01" class="form-control form-control-sm fc-srp"></td>
+                <td><input type="number" name="margin" step="0.1" class="form-control form-control-sm fc-margin"></td>
+                <td class="text-end fc-price">—</td>
+                <td>
+                  <select name="sst" class="form-select form-select-sm fc-sst">
+                    <option value="0">No</option>
+                    <option value="1">8%</option>
+                  </select>
+                </td>
+                <td class="text-end fc-lineamt">—</td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger fc-remove"><i class="bi bi-x"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="small text-secondary mb-2"><i class="bi bi-info-circle me-1"></i>Cost / SRP / Margin are editable for this forecast only. Use the <b>SST 8%</b> toggle on each item to add 8% tax.</div>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="fcAddLine"><i class="bi bi-plus-lg me-1"></i>Add Item</button>
+
+        <div class="alert alert-light border mt-3 mb-0">
+          <div class="d-flex justify-content-between"><span>Total Value</span><b id="fcTotalValue">RM 0.00</b></div>
+          <div class="d-flex justify-content-between mt-1"><span>Potential Profit</span><b id="fcTotalProfit" class="text-success">RM 0.00</b></div>
+        </div>
+
+        <label class="form-label mt-3">Notes</label>
+        <textarea name="notes" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save Forecast</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Edit Forecast modals -->
+{% for f in forecasts %}
+<div class="modal fade" id="editFc{{ f.id }}" tabindex="-1">
+  <div class="modal-dialog modal-xl"><div class="modal-content">
+    <form method="post" action="/forecasts/edit">
+      <input type="hidden" name="id" value="{{ f.id }}">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i>Edit {{ f.fc_no }} — {{ f.customer }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-7">
+            <label class="form-label">Customer <span class="text-danger">*</span></label>
+            <input name="customer" value="{{ f.customer }}" class="form-control customer-combobox" list="companyListE" required>
+            <datalist id="companyListE">
+              {% for n in company_names %}<option value="{{ n }}"></option>{% endfor %}
+            </datalist>
+          </div>
+          <div class="col-md-3"><label class="form-label">Date</label><input type="date" name="date" value="{{ f.date }}" class="form-control"></div>
+          <div class="col-md-2"><label class="form-label">Status</label>
+            <select name="status" class="form-select">
+              {% for s in ['Open','Won','Lost'] %}<option value="{{ s }}" {{ 'selected' if s==f.status }}>{{ s }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <hr>
+        <label class="form-label fw-semibold">Products / Items</label>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2">
+            <thead class="table-light"><tr>
+              <th class="fc-col-product">Product</th><th>Qty</th>
+              <th>Cost</th><th>SRP</th><th>Margin %</th>
+              <th class="text-end">Unit Price</th><th>SST 8%</th>
+              <th class="text-end">Total</th><th></th>
+            </tr></thead>
+            <tbody class="fc-edit-lines">
+              {% for ln in f.lines or [] %}
+              <tr class="fc-line">
+                <td>
+                  <select name="product_id" class="form-select form-select-sm fc-product">
+                    {% for p in products %}
+                    <option value="{{ p.id }}" data-price="{{ p.selling }}" data-profit="{{ p.profit }}" data-srp="{{ p.srp or '' }}" data-margin="{{ p.margin }}" data-cost="{{ p.cost }}" data-cat="{{ p.category }}" {{ 'selected' if p.name==ln.name }}>{{ p.name }} ({{ p.pid }})</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" name="qty" class="form-control form-control-sm fc-qty" value="{{ ln.qty }}" min="1"></td>
+                <td><input type="number" name="cost" step="0.01" class="form-control form-control-sm fc-cost" value="{{ ln.cost }}"></td>
+                <td><input type="number" name="srp" step="0.01" class="form-control form-control-sm fc-srp" value="{{ ln.srp or '' }}"></td>
+                <td><input type="number" name="margin" step="0.1" class="form-control form-control-sm fc-margin" value="{{ ln.margin }}"></td>
+                <td class="text-end fc-price">—</td>
+                <td>
+                  <select name="sst" class="form-select form-select-sm fc-sst">
+                    <option value="0" {{ 'selected' if not ln.get('sst') }}>No</option>
+                    <option value="1" {{ 'selected' if ln.get('sst') }}>8%</option>
+                  </select>
+                </td>
+                <td class="text-end fc-lineamt">—</td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger fc-remove"><i class="bi bi-x"></i></button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary fc-edit-add"><i class="bi bi-plus-lg me-1"></i>Add Item</button>
+        <label class="form-label mt-3">Notes</label>
+        <textarea name="notes" class="form-control" rows="2">{{ f.notes }}</textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save Changes</button></div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var tbody = document.getElementById('fcLines');
+  var totalEl = document.getElementById('fcTotalValue');
+  var profitEl = document.getElementById('fcTotalProfit');
+
+  function setLineFromProduct(row) {
+    var opt = row.querySelector('.fc-product').selectedOptions[0];
+    if (!opt || opt.value === '') return;
+    var costEl = row.querySelector('.fc-cost');
+    var srpEl = row.querySelector('.fc-srp');
+    var marEl = row.querySelector('.fc-margin');
+    if (costEl.value === '' && opt.dataset.cost !== undefined) costEl.value = opt.dataset.cost;
+    if (srpEl.value === '' && opt.dataset.srp !== undefined) srpEl.value = opt.dataset.srp;
+    if (marEl.value === '' && opt.dataset.margin !== undefined) marEl.value = opt.dataset.margin;
+  }
+  function fillLine(row) {
+    var opt = row.querySelector('.fc-product').selectedOptions[0];
+    var qty = parseInt(row.querySelector('.fc-qty').value) || 0;
+    var priceEl = row.querySelector('.fc-price');
+    var amtEl = row.querySelector('.fc-lineamt');
+    if (!opt || opt.value === '') {
+      priceEl.textContent = '—';
+      if (amtEl) amtEl.textContent = '—';
+      return { price: 0 };
+    }
+    var cost = parseFloat(row.querySelector('.fc-cost').value) || 0;
+    var margin = parseFloat(row.querySelector('.fc-margin').value) || 0;
+    var price = (margin >= 100 || margin < 0) ? cost : cost / (1 - margin / 100);
+    priceEl.textContent = 'RM ' + price.toFixed(2);
+    var line = price * qty;
+    var sst = row.querySelector('.fc-sst') && row.querySelector('.fc-sst').value === '1';
+    if (amtEl) amtEl.textContent = sst ? ('RM ' + (line * 1.08).toFixed(2) + ' (incl SST)') : ('RM ' + line.toFixed(2));
+    return { price: sst ? line * 1.08 : line };
+  }
+
+  function makeRow() {
+    var tr = document.createElement('tr');
+    tr.className = 'fc-line';
+    var opts = '<option value="">-- Choose product --</option>';
+    // copy options from the first select
+    var firstSel = tbody.querySelector('.fc-product');
+    opts = firstSel ? firstSel.innerHTML : opts;
+    tr.innerHTML =
+      '<td><select name="product_id" class="form-select form-select-sm fc-product">' + opts + '</select></td>' +
+      '<td><input type="number" name="qty" class="form-control form-control-sm fc-qty" value="1" min="1"></td>' +
+      '<td><input type="number" name="cost" step="0.01" class="form-control form-control-sm fc-cost"></td>' +
+      '<td><input type="number" name="srp" step="0.01" class="form-control form-control-sm fc-srp"></td>' +
+      '<td><input type="number" name="margin" step="0.1" class="form-control form-control-sm fc-margin"></td>' +
+      '<td class="text-end fc-price">—</td>' +
+      '<td><select name="sst" class="form-select form-select-sm fc-sst"><option value="0">No</option><option value="1">8%</option></select></td>' +
+      '<td class="text-end fc-lineamt">—</td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger fc-remove"><i class="bi bi-x"></i></button></td>';
+    return tr;
+  }
+
+  function recalc() {
+    var total = 0, profit = 0;
+    tbody.querySelectorAll('.fc-line').forEach(function (row) {
+      var r = fillLine(row);
+      total += r.price;
+    });
+    totalEl.textContent = 'RM ' + total.toFixed(2);
+    profitEl.textContent = 'RM ' + total.toFixed(2);
+  }
+
+  function recalcEdit(etbody) {
+    // recompute each line in an edit modal's table
+    etbody.querySelectorAll('.fc-line').forEach(fillLine);
+  }
+
+  function bindRow(row) {
+    row.querySelector('.fc-product').addEventListener('change', function () {
+      setLineFromProduct(row);
+      var tb = row.closest('tbody');
+      if (tb && tb.id === 'fcLines') recalc(); else if (tb) recalcEdit(tb);
+    });
+    row.querySelector('.fc-qty').addEventListener('input', function () {
+      var tb = row.closest('tbody');
+      if (tb && tb.id === 'fcLines') recalc(); else if (tb) recalcEdit(tb);
+    });
+    row.querySelector('.fc-cost').addEventListener('input', function () {
+      var tb = row.closest('tbody');
+      if (tb && tb.id === 'fcLines') recalc(); else if (tb) recalcEdit(tb);
+    });
+    row.querySelector('.fc-margin').addEventListener('input', function () {
+      var tb = row.closest('tbody');
+      if (tb && tb.id === 'fcLines') recalc(); else if (tb) recalcEdit(tb);
+    });
+    var sstSel = row.querySelector('.fc-sst');
+    if (sstSel) sstSel.addEventListener('change', function () {
+      var tb = row.closest('tbody');
+      if (tb && tb.id === 'fcLines') recalc(); else if (tb) recalcEdit(tb);
+    });
+    row.querySelector('.fc-remove').addEventListener('click', function () {
+      // count rows in the row's OWN tbody, not the global #fcLines
+      var tb = row.closest('tbody');
+      if (tb && tb.querySelectorAll('.fc-line').length > 1) {
+        row.remove();
+        if (tb.id === 'fcLines') recalc(); else recalcEdit(tb);
+      }
+    });
+  }
+
+  document.getElementById('fcAddLine').addEventListener('click', function () {
+    var row = makeRow();
+    tbody.appendChild(row);
+    bindRow(row);
+  });
+
+  // bind initial row
+  tbody.querySelectorAll('.fc-line').forEach(bindRow);
+  recalc();
+
+  // Bind each edit modal's line rows + its Add Item button
+  document.querySelectorAll('.fc-edit-lines').forEach(function (etbody) {
+    etbody.querySelectorAll('.fc-line').forEach(bindRow);
+  });
+  document.querySelectorAll('.fc-edit-add').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var etbody = btn.closest('.modal').querySelector('.fc-edit-lines');
+      var row = makeRow();
+      etbody.appendChild(row);
+      bindRow(row);
+    });
+  });
+
+  // Recalculate each edit modal's lines the moment it opens, so the
+  // SRP/Margin/Price show immediately on first open (fixes "no data shown").
+  document.querySelectorAll('[id^="editFc"]').forEach(function (modal) {
+    modal.addEventListener('shown.bs.modal', function () {
+      var tb = modal.querySelector('.fc-edit-lines');
+      if (tb) recalcEdit(tb);
+    });
+  });
+})();
+</script>
+{% endblock %}

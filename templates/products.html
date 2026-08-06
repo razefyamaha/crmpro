@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Products · CRM Pro{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Products</h4>
+    <div class="text-secondary small">Product list with cost, SRP, margin, selling price &amp; profit</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/calculator" class="btn btn-outline-primary"><i class="bi bi-calculator me-1"></i>Selling Price Calculator</a>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-lg me-1"></i>Add Product</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header bg-white py-2">
+    <form method="get" class="row g-2">
+      <div class="col-md-7">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search product, ID, category...">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Categories</option>
+          {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category==c }}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1"><a href="/products" class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-arrow-counterclockwise"></i></a></div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0 product-table">
+      <thead class="table-light"><tr>
+        <th>ID</th><th>Product</th><th>Category</th><th class="text-end">Cost</th>
+        <th class="text-end">SRP</th><th class="text-end">Margin %</th><th class="text-end">Selling</th>
+        <th class="text-end">Profit</th><th class="text-end">Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for p in products %}
+        <tr>
+          <td class="text-secondary">{{ p.pid }}</td>
+          <td class="fw-semibold">{{ p.name }}</td>
+          <td>{{ p.category }}</td>
+          <td class="text-end">RM {{ "%.2f"|format(p.cost) }}</td>
+          <td class="text-end">{{ "RM %.2f"|format(p.srp) if p.srp else "—" }}</td>
+          <td class="text-end text-primary fw-semibold">{{ "%.1f"|format(p.margin) }}%</td>
+          <td class="text-end fw-bold">RM {{ "%.2f"|format(p.selling) }}</td>
+          <td class="text-end {{ 'text-success' if p.profit>=0 else 'text-danger' }}">RM {{ "%.2f"|format(p.profit) }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ p.id }}"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delModal{{ p.id }}"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="text-center text-secondary py-4">No products found. Add your first product.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/products/add">
+      <div class="modal-header"><h5 class="modal-title">Add Product</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Product Name <span class="text-danger">*</span></label><input name="name" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Category</label><input name="category" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Cost Price (RM)</label><input id="a_cost" name="cost" type="number" step="0.01" min="0" class="form-control calc-input" required></div>
+          <div class="col-6"><label class="form-label">Margin %</label><input id="a_margin" name="margin" type="number" step="0.1" min="0" max="99" class="form-control calc-input" placeholder="30"></div>
+          <div class="col-6"><label class="form-label">SRP (RM, optional)</label><input name="srp" type="number" step="0.01" min="0" class="form-control"></div>
+          <div class="col-12"><div class="alert alert-light border mb-0 py-2 small">
+            Selling Price: <b id="a_selling" class="text-primary">—</b>
+            &nbsp;·&nbsp; Profit: <b id="a_profit" class="text-success">—</b>
+          </div></div>
+          <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save Product</button></div>
+    </form>
+  </div></div>
+</div>
+
+{% for p in products %}
+<div class="modal fade" id="editModal{{ p.id }}" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/products/edit">
+      <input type="hidden" name="id" value="{{ p.id }}">
+      <div class="modal-header"><h5 class="modal-title">Edit {{ p.pid }} · {{ p.name }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Product Name</label><input name="name" value="{{ p.name }}" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Category</label><input name="category" value="{{ p.category }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Cost Price (RM)</label><input name="cost" value="{{ p.cost }}" type="number" step="0.01" class="form-control e-cost" required></div>
+          <div class="col-6"><label class="form-label">Margin %</label><input name="margin" value="{{ p.margin }}" type="number" step="0.1" class="form-control e-margin"></div>
+          <div class="col-6"><label class="form-label">SRP (RM)</label><input name="srp" value="{{ p.srp if p.srp else '' }}" type="number" step="0.01" class="form-control"></div>
+          <div class="col-12"><div class="alert alert-light border mb-0 py-2 small">
+            Selling Price: <b class="e_selling text-primary">RM {{ "%.2f"|format(p.selling) }}</b>
+            &nbsp;·&nbsp; Profit: <b class="e_profit text-success">RM {{ "%.2f"|format(p.profit) }}</b>
+          </div></div>
+          <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2">{{ p.notes }}</textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="delModal{{ p.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm"><div class="modal-content">
+    <form method="post" action="/products/delete">
+      <input type="hidden" name="id" value="{{ p.id }}">
+      <div class="modal-body text-center py-4">
+        <i class="bi bi-exclamation-triangle text-danger" style="font-size:2.5rem"></i>
+        <p class="mt-2 mb-0">Delete product <b>{{ p.name }}</b>?<br><small class="text-secondary">This cannot be undone.</small></p>
+      </div>
+      <div class="modal-footer justify-content-center"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger">Delete</button></div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calc(cost, margin, qty){
+  cost = parseFloat(cost)||0; margin = parseFloat(margin)||0; qty = parseInt(qty)||1;
+  if(margin>=100){ return null; }
+  const selling = cost/(1-margin/100);
+  return { selling, profit: selling-cost, cost, totalSelling: selling*qty, totalProfit:(selling-cost)*qty, totalCost:cost*qty };
+}
+function fmt(n){ return 'RM ' + n.toLocaleString('en-MY',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtQ(n){ return 'RM ' + n.toLocaleString('en-MY',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+// add modal live calc
+function refreshAdd(){
+  const c = calc(document.getElementById('a_cost').value, document.getElementById('a_margin').value, 1);
+  document.getElementById('a_selling').textContent = c ? fmt(c.selling) : '—';
+  document.getElementById('a_profit').textContent = c ? fmt(c.profit) : '—';
+}
+document.getElementById('a_cost').addEventListener('input', refreshAdd);
+document.getElementById('a_margin').addEventListener('input', refreshAdd);
+
+// edit modals live calc
+document.querySelectorAll('.modal').forEach(m=>{
+  const costEl = m.querySelector('.e-cost'); const marginEl = m.querySelector('.e-margin');
+  if(costEl && marginEl){
+    const sellEl = m.querySelector('.e_selling'); const profEl = m.querySelector('.e_profit');
+    function upd(){ const c = calc(costEl.value, marginEl.value, 1); sellEl.textContent = c?fmt(c.selling):'—'; profEl.textContent = c?fmt(c.profit):'—'; }
+    costEl.addEventListener('input', upd); marginEl.addEventListener('input', upd);
+  }
+});
+</script>
+{% endblock %}

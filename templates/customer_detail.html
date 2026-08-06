@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.company }} · CRM Pro{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <a href="/quotations" class="text-decoration-none text-secondary small"><i class="bi bi-arrow-left me-1"></i>Back to Quotations</a>
+    <h4 class="fw-bold mb-0 mt-1">{{ customer.company }}</h4>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addQuoteModal"><i class="bi bi-plus-lg me-1"></i>New Quotation</button>
+    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil me-1"></i>Edit</button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal"><i class="bi bi-upload me-1"></i>Upload PDF</button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Info card -->
+  <div class="col-lg-5">
+    <div class="card chart-card h-100">
+      <div class="card-header bg-white"><i class="bi bi-person-lines-fill text-primary me-1"></i>Customer Details</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4 text-secondary">Company</dt><dd class="col-sm-8">{{ customer.company }}</dd>
+          <dt class="col-sm-4 text-secondary">Industry</dt><dd class="col-sm-8">{{ customer.industry or '—' }}</dd>
+          <dt class="col-sm-4 text-secondary">Contact</dt><dd class="col-sm-8">{{ customer.contact or '—' }}</dd>
+          <dt class="col-sm-4 text-secondary">Phone</dt><dd class="col-sm-8">{{ customer.phone or '—' }}</dd>
+          <dt class="col-sm-4 text-secondary">Email</dt><dd class="col-sm-8">{{ customer.email or '—' }}</dd>
+          <dt class="col-sm-4 text-secondary">Address</dt><dd class="col-sm-8">{{ customer.address or '—' }}</dd>
+          <dt class="col-sm-4 text-secondary">Lead Source</dt><dd class="col-sm-8">{% if customer.source %}<span class="lead-source-chip"><i class="bi bi-tag me-1"></i>{{ customer.source }}</span>{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4 text-secondary">Stage</dt>
+          <dd class="col-sm-8">
+            <span class="badge {{ 'text-bg-success' if customer.stage=='Won' else 'text-bg-danger' if customer.stage=='Lost' else 'text-bg-warning text-dark' if customer.stage=='Quoted' else 'text-bg-info' if customer.stage=='Negotiating' else 'text-bg-primary' if customer.stage=='Contacted' else 'text-bg-secondary' }}">{{ customer.stage }}</span>
+          </dd>
+          <dt class="col-sm-4 text-secondary">Notes</dt><dd class="col-sm-8">{{ customer.notes or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Uploaded files card -->
+  <div class="col-lg-7">
+    <div class="card chart-card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-folder2-open text-warning me-1"></i>Quotation Files ({{ files|length }})</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#uploadModal"><i class="bi bi-upload me-1"></i> Upload</button>
+      </div>
+      <div class="card-body">
+        {% if files %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light"><tr>
+              <th style="width:52px"></th><th>File Name</th><th>Date Uploaded</th><th class="text-end">Actions</th>
+            </tr></thead>
+            <tbody>
+            {% for f in files %}
+              <tr class="pdf-open" data-src="{{ url_for('customer_file', cid=customer.id, fname=f.name) }}" data-name="{{ f.name }}" data-zoomkey="cust_{{ customer.id }}" style="cursor:pointer">
+                <td>
+                  {% if f.name.lower().endswith('.pdf') %}
+                  <img src="{{ url_for('customer_file_thumb', cid=customer.id, fname=f.name) }}" alt="thumb" class="file-list-thumb" loading="lazy"
+                       onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
+                  <i class="bi bi-file-earmark-pdf text-danger file-list-icon" style="display:none"></i>
+                  {% else %}
+                  <i class="bi bi-file-earmark text-secondary file-list-icon"></i>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="fw-semibold text-truncate" style="max-width:200px" title="{{ f.name }}">{{ f.name }}</div>
+                  {% if f.linked_qno %}
+                  <div class="mt-1">
+                    <span class="badge text-bg-info">{{ f.linked_qno }}</span>
+                    {% if f.linked_amount != '' and f.linked_amount %}
+                    <span class="badge text-bg-success">RM {{ "%.2f"|format(f.linked_amount) }}</span>
+                    {% endif %}
+                    {% if f.linked_date %}<span class="badge text-bg-secondary"><i class="bi bi-calendar3 me-1"></i>{{ f.linked_date }}</span>{% endif %}
+                  </div>
+                  {% endif %}
+                </td>
+                <td class="small text-secondary"><i class="bi bi-calendar-event me-1"></i>{{ f.mtime }}</td>
+                <td class="text-end">
+                  <form method="post" action="/customer/{{ customer.id }}/file/delete" class="d-inline" onsubmit="return confirm('Delete this file?');">
+                    <input type="hidden" name="name" value="{{ f.name }}">
+                    <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="small text-secondary mt-2">Click a file to view it full size in the page.</div>
+        {% else %}
+        <p class="text-secondary text-center py-4 mb-0"><i class="bi bi-inbox me-1"></i>No files uploaded yet. Click "Upload Quotation" to add one.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quotations -->
+<div class="card chart-card">
+  <div class="card-header bg-white"><i class="bi bi-file-earmark-text text-primary me-1"></i>Quotations ({{ quotes|length }})</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr>
+        <th>Quotation</th><th>Date</th><th>Status</th><th class="text-end">Amount (RM)</th><th>Rep</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for q in quotes %}
+        <tr>
+          <td class="fw-semibold">{{ q.qno }}</td>
+          <td>{{ q.date }} <span class="text-secondary small">{{ q.time }}</span></td>
+          <td><span class="badge {{ 'text-bg-success' if q.status in ('Completed','Deal Won') else 'text-bg-danger' if q.status=='Deal Lost' else 'text-bg-info' }}">{{ q.status }}</span></td>
+          <td class="text-end">RM {{ "%.2f"|format(q.amount) }}</td>
+          <td>{{ q.created_by }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editQModal{{ q.id }}" title="Edit"><i class="bi bi-pencil"></i></button>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-center text-secondary py-4">No quotations for this customer yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Edit quotation modals -->
+{% for q in quotes %}
+<div class="modal fade" id="editQModal{{ q.id }}" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/quotations/edit">
+      <input type="hidden" name="id" value="{{ q.id }}">
+      <div class="modal-header"><h5 class="modal-title">Edit {{ q.qno }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label">Quotation No</label><input name="qno" value="{{ q.qno }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Date</label><input type="date" name="date" value="{{ q.date }}" class="form-control"></div>
+          <div class="col-12"><label class="form-label">Company</label><input name="company" value="{{ q.company }}" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Amount (RM)</label><input type="number" step="0.01" name="amount" value="{{ q.amount }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Status</label>
+            <select name="status" class="form-select">{% for s in statuses %}<option {{ 'selected' if s==q.status }}>{{ s }}</option>{% endfor %}</select></div>
+          <div class="col-6"><label class="form-label">Time</label><input name="time" value="{{ q.time }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Created By</label><input name="created_by" value="{{ q.created_by }}" class="form-control"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+
+<!-- New Quotation modal -->
+<div class="modal fade" id="addQuoteModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/quotations/add" enctype="multipart/form-data">
+      <input type="hidden" name="company" value="{{ customer.company }}">
+      <input type="hidden" name="back" value="customer">
+      <input type="hidden" name="back_cid" value="{{ customer.id }}">
+      <div class="modal-header"><h5 class="modal-title">New Quotation — {{ customer.company }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label">Quotation No</label><input name="qno" class="form-control" placeholder="Auto"></div>
+          <div class="col-6"><label class="form-label">Date</label><input type="date" name="date" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Amount (RM)</label><input type="number" step="0.01" min="0" name="amount" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Status</label>
+            <select name="status" class="form-select">{% for s in ['New','Quotation In Progress','Completed','Deal Won','Deal Lost'] %}<option>{{ s }}</option>{% endfor %}</select></div>
+          <div class="col-6"><label class="form-label">Time</label><input name="time" class="form-control" placeholder="4:00 PM"></div>
+          <div class="col-6"><label class="form-label">Created By</label><input name="created_by" class="form-control" placeholder="Rep"></div>
+          <div class="col-12"><label class="form-label">Upload Quotation PDF (optional)</label>
+            <input type="file" name="quote_file" accept="application/pdf,.pdf" class="form-control">
+            <div class="form-text pdf-auto-hint">Selecting a quotation PDF auto-fills the amount / date / quotation no.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Add Quotation</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Upload modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/customer/{{ customer.id }}/upload" enctype="multipart/form-data">
+      <div class="modal-header"><h5 class="modal-title">Upload Quotation</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p class="small text-secondary mb-3">Saved to {{ customer.company }}'s folder. If it's a quotation PDF, empty customer details (contact, phone, address) are auto-filled from it.</p>
+        <input type="file" name="quote_file" accept="application/pdf,.pdf" class="form-control" required>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/companies/edit">
+      <input type="hidden" name="id" value="{{ customer.id }}">
+      <div class="modal-header"><h5 class="modal-title">Edit Customer</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Company Name</label><input name="company" value="{{ customer.company }}" class="form-control" required></div>
+          <div class="col-6"><label class="form-label">Industry</label><input name="industry" value="{{ customer.industry }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Stage</label>
+            <select name="stage" class="form-select">
+              {% for s in ['New','Contacted','Quoted','Negotiating','Won','Lost'] %}<option {{ 'selected' if s==customer.stage }}>{{ s }}</option>{% endfor %}
+            </select></div>
+          <div class="col-6"><label class="form-label">Contact Person</label><input name="contact" value="{{ customer.contact }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Phone</label><input name="phone" value="{{ customer.phone }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Email</label><input name="email" value="{{ customer.email }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Lead Source</label><input name="source" value="{{ customer.source }}" class="form-control"></div>
+          <div class="col-12"><label class="form-label">Address</label><input name="address" value="{{ customer.address }}" class="form-control"></div>
+          <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2">{{ customer.notes }}</textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- PDF viewer modal is shared in base.html -->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-fill the New Quotation form from an uploaded quotation PDF.
+(function () {
+  function fillFromPdf(fileInput) {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return;
+    var modal = fileInput.closest('.modal');
+    var fd = new FormData();
+    fd.append('quote_file', file);
+    var hint = modal.querySelector('.pdf-auto-hint');
+    if (hint) hint.textContent = 'Reading PDF…';
+    fetch('/quotations/parse-preview', { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok) { if (hint) hint.textContent = ''; return; }
+        var d = res.data || {};
+        if (hint) {
+          hint.textContent = 'PDF read. Fields auto-filled — you can edit them.';
+          hint.className = 'form-text pdf-auto-hint text-success';
+        }
+        function setIfEmpty(name, val) {
+          if (!val) return;
+          var el = modal.querySelector('[name="' + name + '"]');
+          if (el && (el.value === '' || el.value === undefined || el.value === null)) el.value = val;
+        }
+        setIfEmpty('qno', d.quotation_no);
+        setIfEmpty('amount', d.total);
+        if (d.date) {
+          var m = d.date.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+          if (m) setIfEmpty('date', m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'));
+        }
+      })
+      .catch(function () { if (hint) hint.textContent = ''; });
+  }
+  var input = document.querySelector('#addQuoteModal input[name="quote_file"]');
+  if (input) input.addEventListener('change', function () { fillFromPdf(this); });
+})();
+</script>
+{% endblock %}

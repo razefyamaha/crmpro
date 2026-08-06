@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · CRM Pro{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Dashboard</h4>
+    <div class="text-secondary small">Sales overview from your Excel database</div>
+  </div>
+  <a href="/quotations" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Quotation</a>
+</div>
+
+<div class="row g-3 mb-4">
+  {% for c in cards %}
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card h-100 {{ c.color }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-label">{{ c.label }}</div>
+            <div class="kpi-value">{{ c.value }}</div>
+            <div class="kpi-sub">{{ c.sub }}</div>
+          </div>
+          <span class="kpi-icon"><i class="bi {{ c.icon }}"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Sales by month -->
+<div class="card chart-card mb-4 border-0">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-calendar-month text-success me-1"></i> Sales by Month — Completed / Deal Won</span>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <select name="smonth" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto">
+        {% for m in months_avail %}
+        <option value="{{ m }}" {{ 'selected' if m==sel_month }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+  <div class="card-body">
+    {% if month_label_str %}
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <div class="calc-box"><div class="text-secondary small">Month</div>
+          <div class="h4 fw-bold text-primary mb-0">{{ month_label_str }}</div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="calc-box"><div class="text-secondary small">Completed + Won Value</div>
+          <div class="h4 fw-bold text-success mb-0">RM {{ "{:,.2f}".format(month_total) }}</div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="calc-box"><div class="text-secondary small">Closed Deals</div>
+          <div class="h4 fw-bold mb-0">{{ month_won_count }}</div></div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light"><tr>
+          <th>Quotation</th><th>Date</th><th>Company</th><th>Status</th><th class="text-end">Amount (RM)</th><th>Rep</th>
+        </tr></thead>
+        <tbody>
+        {% for q in month_sales %}
+          <tr>
+            <td class="fw-semibold">{{ q.qno }}</td>
+            <td>{{ q.date }}</td>
+            <td>{{ q.company }}</td>
+            <td><span class="badge text-bg-success">{{ q.status }}</span></td>
+            <td class="text-end">RM {{ "%.2f"|format(q.amount) }}</td>
+            <td>{{ q.created_by }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="text-center text-secondary py-4">No completed/deal-won sales for this month.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-secondary text-center py-3 mb-0">No sales data yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Closed sales by month chart -->
+<div class="card chart-card mb-4 border-0">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-bar-chart-line-fill text-success me-1"></i> Closed Sales (Completed / Deal Won) by Month — Jan to Current</span>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <select name="cyear" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto">
+        {% for y in chart_years %}
+        <option value="{{ y }}" {{ 'selected' if y==chart_year }}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+  <div class="card-body">
+    <canvas id="closedChart" height="90"></canvas>
+  </div>
+</div>
+
+<div class="card chart-card mb-4 border-0">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-bullseye text-primary me-1"></i> Monthly Target — Closed Sales (Last 3 Months)</span>
+    <span class="badge text-bg-primary">Target RM {{ "{:,.0f}".format(target) }} / month</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      {% for r in target_rows %}
+      <div class="col-md-4">
+        <div class="d-flex justify-content-between mb-1">
+          <span class="fw-semibold">{{ r.label }}</span>
+          <span class="text-secondary small">RM {{ "{:,.0f}".format(r.value) }} / RM {{ "{:,.0f}".format(r.target) }}</span>
+        </div>
+        <div class="progress" style="height:16px">
+          <div class="progress-bar {{ 'bg-danger' if r.progress < 50 else 'bg-warning' if r.progress < 100 else 'bg-success' }}"
+               style="width:{{ r.progress }}%">{{ "{:,.0f}".format(r.progress) }}%</div>
+        </div>
+        <div class="small text-secondary mt-1">{{ "On track" if r.progress >= 100 else ("Halfway there" if r.progress >= 50 else "Behind target") }}</div>
+      </div>
+      {% endfor %}
+      <div class="col-md-12 border-top pt-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-secondary">Combined closed sales (3 months)</div>
+            <div class="h4 mb-0 fw-bold">RM {{ "{:,.2f}".format(target_total) }}</div>
+          </div>
+          <div class="text-end">
+            <div class="small text-secondary">vs combined target</div>
+            <div class="h5 mb-0 {{ 'text-success' if target_total >= target*3 else 'text-danger' }}">RM {{ "{:,.0f}".format(target*3) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forecast card -->
+<div class="card chart-card mb-4 border-0">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-graph-up-arrow text-success me-1"></i> Forecast — Customer Projections</span>
+    <a href="/forecast" class="btn btn-sm btn-outline-success">Open Forecast</a>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="calc-box"><div class="text-secondary small">Forecasts</div>
+          <div class="h4 fw-bold text-primary mb-0">{{ fc_count }}</div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="calc-box"><div class="text-secondary small">Forecast Value</div>
+          <div class="h4 fw-bold text-primary mb-0">RM {{ "{:,.0f}".format(fc_total_value) }}</div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="calc-box"><div class="text-secondary small">Potential Profit</div>
+          <div class="h4 fw-bold text-success mb-0">RM {{ "{:,.0f}".format(fc_total_profit) }}</div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="calc-box"><div class="text-secondary small">Open</div>
+          <div class="h4 fw-bold text-warning mb-0">{{ fc_open }}</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-5">
+    <div class="card chart-card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-pie-chart-fill text-primary me-1"></i>Status Distribution</span>
+      </div>
+      <div class="card-body d-flex align-items-center"><canvas id="statusChart"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card chart-card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-graph-up-arrow text-primary me-1"></i>Quotations Per Month</span>
+      </div>
+      <div class="card-body"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card chart-card mb-4">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-trophy-fill text-primary me-1"></i>Top Companies by Completed Sales (count &amp; value)</span>
+  </div>
+  <div class="card-body"><canvas id="topCompChart"></canvas></div>
+</div>
+
+<div class="card chart-card">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span>Recent Quotations</span>
+    <a href="/quotations" class="btn btn-sm btn-outline-primary">View all</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr>
+        <th>Quotation</th><th>Date</th><th>Company</th><th>Status</th><th class="text-end">Amount</th><th>Rep</th>
+      </tr></thead>
+      <tbody>
+      {% for q in recent %}
+        <tr>
+          <td class="fw-semibold">{{ q.qno }}</td>
+          <td>{{ q.date }} <span class="text-secondary small">{{ q.time }}</span></td>
+          <td>{{ q.company }}</td>
+          <td><span class="badge {{ 'text-bg-success' if q.status in ('Completed','Deal Won') else 'text-bg-danger' if q.status=='Deal Lost' else 'text-bg-info' }}">{{ q.status }}</span></td>
+          <td class="text-end">RM {{ "%.2f"|format(q.amount) }}</td>
+          <td>{{ q.created_by }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const statusLabels = {{ status_labels|safe }};
+const statusValues = {{ status_values|safe }};
+const trendLabels = {{ trend_labels|safe }};
+const trendCounts = {{ trend_counts|safe }};
+const trendAmounts = {{ trend_amounts|safe }};
+const topCompLabels = {{ top_comp_labels|safe }};
+const topCompCounts = {{ top_comp_counts|safe }};
+const topCompAmounts = {{ top_comp_amounts|safe }};
+const closedLabels = {{ closed_labels|safe }};
+const closedCounts = {{ closed_counts|safe }};
+const closedAmounts = {{ closed_amounts|safe }};
+
+// Rich hover tooltips: show dataset name + value, formatted nicely.
+// Chart.js v4 passes a single context object to callbacks.label (not an array).
+const rm = v => 'RM ' + Number(v || 0).toLocaleString('en-MY');
+const tooltipBody = ctx => {
+  if (!ctx) return '';
+  // In a horizontal bar chart the value lives in parsed.x; in vertical it is parsed.y.
+  const isHoriz = !!(ctx.chart && ctx.chart.config && ctx.chart.config.options &&
+                     ctx.chart.config.options.indexAxis === 'y');
+  const parsed = ctx.parsed || {};
+  let raw = ctx.raw;
+  if (isHoriz && parsed.x !== undefined) raw = parsed.x;
+  else if (!isHoriz && parsed.y !== undefined) raw = parsed.y;
+  else if (parsed.x !== undefined) raw = parsed.x;
+  const lab = (ctx.dataset && ctx.dataset.label) ? ctx.dataset.label : (ctx.label || '');
+  const isMoney = /value|RM|rm/i.test(lab);
+  return (lab ? lab + ': ' : '') + (isMoney ? rm(raw) : Number(raw || 0).toLocaleString('en-MY'));
+};
+
+new Chart(document.getElementById('statusChart'), {
+  type: 'doughnut',
+  data: { labels: statusLabels, datasets: [{ data: statusValues, backgroundColor: ['#0dcaf0','#198754','#20c997','#dc3545'] }] },
+  options: { interaction: { mode: 'nearest', intersect: false }, plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true, callbacks: { label: ctx => ' ' + ctx.label + ': ' + Number(ctx.raw || 0).toLocaleString('en-MY') + ' quotation(s)' } } } }
+});
+new Chart(document.getElementById('closedChart'), {
+  type: 'bar',
+  data: {
+    labels: closedLabels,
+    datasets: [
+      { label: 'Deals Closed', data: closedCounts, backgroundColor: 'rgba(13,110,253,.75)', yAxisID: 'y' },
+      { label: 'Value (RM)', data: closedAmounts, type: 'line', borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.15)', yAxisID: 'y1', tension: .35, fill: true }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true, callbacks: { label: tooltipBody } } },
+    scales: {
+      y: { beginAtZero: true, position: 'left', ticks: { stepSize: 1 } },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+    }
+  }
+});
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: trendLabels,
+    datasets: [
+      { label: 'Count', data: trendCounts, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.15)', yAxisID: 'y', tension: .35, fill: true },
+      { label: 'Value (RM)', data: trendAmounts, borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.1)', yAxisID: 'y1', tension: .35 }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true, callbacks: { label: tooltipBody } } },
+    scales: {
+      y: { beginAtZero: true, position: 'left' },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+    }
+  }
+});
+new Chart(document.getElementById('topCompChart'), {
+  type: 'bar',
+  data: {
+    labels: topCompLabels,
+    datasets: [
+      { label: 'Completed Sales', data: topCompCounts, backgroundColor: 'rgba(13,110,253,.75)', xAxisID: 'x' },
+      { label: 'Value (RM)', data: topCompAmounts, type: 'bar', backgroundColor: 'rgba(25,135,84,.75)', xAxisID: 'x1' }
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    interaction: { mode: 'index', intersect: true },
+    plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true, callbacks: { label: tooltipBody } } },
+    scales: {
+      x: { beginAtZero: true, position: 'bottom', title: { display: true, text: 'Sales count' } },
+      x1: { beginAtZero: true, position: 'top', title: { display: true, text: 'Value (RM)' }, grid: { drawOnChartArea: false } }
+    }
+  }
+});
+</script>
+{% endblock %}
